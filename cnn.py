@@ -71,6 +71,7 @@ def build_cnn(num_classes: int, image_dim: int = 32):
 
 def train_cnn(X_train, X_test, Y_train, Y_test, model, epochs=10, batch_size=100):
     # train  / test the model
+    # TODO
     model.fit(
         X_train, 
         Y_train, 
