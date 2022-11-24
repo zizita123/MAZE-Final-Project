@@ -6,3 +6,5 @@ Links
 - [Dataset](https://www.kaggle.com/datasets/andrewmvd/bone-marrow-cell-classification)
 
 Mike Commit
+
+250x250x3 images
