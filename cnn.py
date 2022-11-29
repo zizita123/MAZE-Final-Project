@@ -7,18 +7,45 @@ DATA_DIR = "/data/images/"
 IMAGE_PATH = os.getcwd() + DATA_DIR
 
 class ImagePot:
+    # parsed from abbreviations.csv
+    CLASSNAME_LOOKUP = {
+        'ABE': 'Abnormal eosinophil',
+        'ART': 'Artefact',
+        'BAS': 'Basophil',
+        'BLA': 'Blast',
+        'EBO': 'Erythroblast',
+        'EOS': 'Eosinophil',
+        'FGC': 'Faggott cell',
+        'HAC': 'Hairy cell',
+        'KSC': 'Smudge cell',
+        'LYI': 'Immature lymphocyte',
+        'LYT': 'Lymphocyte',
+        'MMZ': 'Metamyelocyte',
+        'MON': 'Monocyte',
+        'MYB': 'Myelocyte',
+        'NGB': 'Band neutrophil',
+        'NGS': 'Segmented neutrophil',
+        'NIF': 'Not identifiable',
+        'OTH': 'Other cell',
+        'PEB': 'Proerythroblast',
+        'PLM': 'Plasma cell',
+        'PMO': 'Promyelocyte',
+    }
+
     def __init__(self, image_paths: List[str], classname: str, encoding: Optional[List[int]] = None):
         self.image_paths = image_paths
         self.classname = classname
         self.encoding = encoding
+        self.full_name = self.CLASSNAME_LOOKUP.get(classname, "?")
 
     def set_encoding(self, encoding) -> None:
         self.encoding = encoding
 
     def __str__(self) -> str:
-        return "Group of Images of Class {0}: containing {1} file(s)".format(
+        return "Image Pot containing Class {0} ({1}), {2} file(s)".format(
             self.classname, 
-            len(self.image_paths)
+            self.full_name,
+            len(self.image_paths),
         )
 
     def __repr__(self) -> str:
@@ -26,8 +53,10 @@ class ImagePot:
 
 def load_images(
         num_image_minimum: int = 100, 
-        num_image_limit: Optional[int] = 200
+        num_image_limit: Optional[int] = 200,
+        print_files_on_disk: bool = False,
     ) -> Dict[str, Dict[str, object]]: 
+
     # these are the labels enclosing each folder of images
     sub_dirs = sorted([y for x in os.walk(IMAGE_PATH) if (y := (x[0].split(IMAGE_PATH)[-1]))])
 
@@ -37,10 +66,12 @@ def load_images(
     for folder in sub_dirs:
         file_names = os.listdir("/".join([IMAGE_PATH, folder]))
         num_images = len(file_names)
-        print(f"Classname: {folder} has {num_images} images.")
+        if print_files_on_disk:
+            print(f"Classname: {folder} has {num_images} images.")
+
         if num_images >= num_image_minimum:
             good_folders[folder] = {
-                'images': ImagePot([IMAGE_PATH + folder + x for x in file_names[:num_image_limit]], folder), 
+                'pot': ImagePot([IMAGE_PATH + folder + "/" + x for x in file_names[:num_image_limit]], folder), 
                 'classname': folder,
                 'ohe': None,
             }
@@ -51,8 +82,10 @@ def load_images(
         encoding = ohe_classes[i]
         # set equal to available classes
         encoding[i] = 1
-        good_folders[k]['images'].set_encoding(encoding)
-        good_folders[k]['ohe'] = encoding
+        good_folders[k]['pot'].set_encoding(encoding)
+
+        # simplify repo structure
+        good_folders[k] = good_folders[k]['pot']
 
     return good_folders
 
