@@ -76,6 +76,9 @@ class ImagePot:
     def __repr__(self) -> str:
         return str(self)
 
+    def __len__(self) -> int:
+        return len(self.image_paths)
+
 def load_images(
         num_image_minimum: int = 100, 
         num_image_limit: Optional[int] = 200,
@@ -89,7 +92,7 @@ def load_images(
     load_classes = load_classes or sub_dirs
 
     # ....
-    sub_dirs = sorted(list(set(sub_dirs).intersection(set(load_classes))))
+    sub_dirs = sorted(load_classes)
 
     # assume that data processing script has already un-nested image contents
     good_folders = {}
@@ -106,9 +109,12 @@ def load_images(
                 'classname': folder,
                 'ohe': None,
             }
+        else:
+            print(f"WARNING: Classname: {folder} had fewer than {num_image_minimum} images. Had {num_images}")
 
     # directory of valid images
     ohe_classes = [([0] * len(good_folders)) for _ in range(len(good_folders))]
+
     for i, k in enumerate(good_folders):
         encoding = ohe_classes[i]
         # set equal to available classes
@@ -145,7 +151,13 @@ def get_nn_data(
             # skip it
             continue
             
-        print("Loading images in {} ({}/{})".format(class_name, i + 1, total_classes))
+        total_images = len(pot)
+        print("Loading {} images in {} ({}/{})".format(
+            total_images, 
+            class_name, 
+            i + 1, 
+            total_classes
+        ))
 
         x0, y0, x1, y1 = pot.get_test_train_split(test_train_split)
         # TRAIN
@@ -180,8 +192,12 @@ def shuffle_data_and_labels(data: np.array, labels: np.array) -> Tuple[np.array,
     s_l = tf.gather(labels, idx)
     return s_d, s_l
 
-def load_data_for_training(load_classes: List[str]) -> T_TEST_TRAIN:
-    images = load_images(load_classes=load_classes)
+def load_data_for_training(min_images: int, max_images: int, load_classes: List[str]) -> T_TEST_TRAIN:
+    images = load_images(
+        num_image_minimum=min_images,
+        num_image_limit=max_images, 
+        load_classes=load_classes,
+    )
     return get_nn_data(images, load_classes, 0.8, shuffle=True)
 
 
@@ -236,12 +252,19 @@ def build_cnn(num_classes: int, image_dim: int = 32):
         tf.keras.layers.MaxPooling2D(),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Dropout(.1),
+        # second conv
+        tf.keras.layers.Conv2D(filters=256, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),
+        tf.keras.layers.MaxPooling2D(),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Dropout(.1),
         # ----
         tf.keras.layers.Flatten(),
         # dense layers
         tf.keras.layers.Dense(128, activation='relu'),
         tf.keras.layers.Dropout(.2),
         tf.keras.layers.Dense(256, activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Dense(512, activation='relu'),
         # classifier
         tf.keras.layers.Dense(num_classes, activation='softmax'),
     ])
@@ -267,9 +290,14 @@ def train_cnn(X_train, X_test, Y_train, Y_test, model, epochs=10, batch_size=100
     return model
 
 if __name__ == "__main__":
-    load_classes = ["ART", "BAS"]
-    X0, Y0, X1, Y1 = load_data_for_training(load_classes)
+    # TODO: fix the data loader, it doesn't actually filter stuff out with fewer than n images
+    load_classes = ["ART", "BAS", "BLA", "EBO"]
+    X0, Y0, X1, Y1 = load_data_for_training(
+        min_images=400,
+        max_images=400,
+        load_classes=load_classes,
+    )
     
-    model = build_cnn(len(load_classes))
+    model = build_cnn(len(load_classes), image_dim=250)
     train_cnn(X0, Y0, X1, Y1, model)
 
