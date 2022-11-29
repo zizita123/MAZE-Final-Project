@@ -58,8 +58,8 @@ class ImagePot:
         train, test = self.image_paths[:div], self.image_paths[div:]
         
         # load the images
-        train = np.array([cv2.imread(x) for x in train])
-        test = np.array([cv2.imread(x) for x in test])
+        train = np.array([cv2.imread(x).astype(np.float32) for x in train])
+        test = np.array([cv2.imread(x).astype(np.float32) for x in test])
 
         # convention in our assignments
         X0, X1 = train, test
@@ -80,10 +80,16 @@ def load_images(
         num_image_minimum: int = 100, 
         num_image_limit: Optional[int] = 200,
         print_files_on_disk: bool = False,
+        load_classes: List[str] = None,
     ) -> Dict[str, Dict[str, object]]: 
 
     # these are the labels enclosing each folder of images
     sub_dirs = sorted([y for x in os.walk(IMAGE_PATH) if (y := (x[0].split(IMAGE_PATH)[-1]))])
+
+    load_classes = load_classes or sub_dirs
+
+    # ....
+    sub_dirs = sorted(list(set(sub_dirs).intersection(set(load_classes))))
 
     # assume that data processing script has already un-nested image contents
     good_folders = {}
@@ -139,7 +145,6 @@ def get_nn_data(
             # skip it
             continue
             
-
         print("Loading images in {} ({}/{})".format(class_name, i + 1, total_classes))
 
         x0, y0, x1, y1 = pot.get_test_train_split(test_train_split)
@@ -176,7 +181,7 @@ def shuffle_data_and_labels(data: np.array, labels: np.array) -> Tuple[np.array,
     return s_d, s_l
 
 def load_data_for_training(load_classes: List[str]) -> T_TEST_TRAIN:
-    images = load_images()
+    images = load_images(load_classes=load_classes)
     return get_nn_data(images, load_classes, 0.8, shuffle=True)
 
 
@@ -184,14 +189,14 @@ def build_cnn(num_classes: int, image_dim: int = 32):
     """
     Placeholder values for now
     """
-    input_prep_fn = tf.keras.Seqeuential([
+    input_prep_fn = tf.keras.Sequential([
         # color scale
         tf.keras.layers.Rescaling(scale=1 / 255),
         # image resizing to n x n pixels
         tf.keras.layers.Resizing(image_dim, image_dim),
     ])
 
-    input_aug_fn = tf.keras.Seqeuential([
+    input_aug_fn = tf.keras.Sequential([
         tf.keras.layers.RandomTranslation(
             height_factor=0.15,
             width_factor=0.15,
@@ -222,12 +227,12 @@ def build_cnn(num_classes: int, image_dim: int = 32):
 
     cnn_model = tf.keras.Sequential([
         # first conv
-        tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), actuvation='relu', padding='same'),
+        tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),
         tf.keras.layers.MaxPooling2D(),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Dropout(.3),
         # second conv
-        tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), actuvation='relu', padding='same'),
+        tf.keras.layers.Conv2D(filters=64, kernel_size=3, strides=(2, 2), activation='relu', padding='same'),
         tf.keras.layers.MaxPooling2D(),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Dropout(.1),
@@ -247,21 +252,24 @@ def build_cnn(num_classes: int, image_dim: int = 32):
         metrics=["categorical_accuracy"]
     )
 
+    print("Built CNN model...")
     return cnn_model
 
 def train_cnn(X_train, X_test, Y_train, Y_test, model, epochs=10, batch_size=100):
     # train  / test the model
     model.fit(
         X_train, 
-        Y_train, 
+        X_test, 
         epochs=epochs, 
         batch_size=batch_size, 
-        validation_data=(X_test, Y_test)
+        validation_data=(Y_train, Y_test)
     )
     return model
 
 if __name__ == "__main__":
     load_classes = ["ART", "BAS"]
     X0, Y0, X1, Y1 = load_data_for_training(load_classes)
+    
+    model = build_cnn(len(load_classes))
+    train_cnn(X0, Y0, X1, Y1, model)
 
-    print(X0)
