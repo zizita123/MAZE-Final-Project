@@ -178,7 +178,7 @@ def get_nn_data(
     X0, Y0 = shuffle_data_and_labels(X0, Y0)
     X1, Y1 = shuffle_data_and_labels(X1, Y1)
 
-    return X0, Y0, X1, Y1
+    return X0, Y0, X1, Y1, load_classes
 
 def shuffle_data_and_labels(data: np.array, labels: np.array) -> Tuple[np.array, np.array]:
     x = data.shape[0]
@@ -291,13 +291,12 @@ def train_cnn(X_train, X_test, Y_train, Y_test, model, epochs=10, batch_size=100
 
 if __name__ == "__main__":
     # TODO: fix the data loader, it doesn't actually filter stuff out with fewer than n images
-    load_classes = ["ART", "BAS", "BLA", "EBO"]
-    X0, Y0, X1, Y1 = load_data_for_training(
+    load_classes = None
+    X0, Y0, X1, Y1, loaded_classes = load_data_for_training(
         min_images=400,
         max_images=400,
         load_classes=load_classes,
     )
     
-    model = build_cnn(len(load_classes), image_dim=250)
+    model = build_cnn(len(loaded_classes), image_dim=250)
     train_cnn(X0, Y0, X1, Y1, model)
-
